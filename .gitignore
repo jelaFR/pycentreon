@@ -1,5 +1,7 @@
 # Execution 
+lc.pem
 execute.py
+core_old/
 
 # Environments
 venv
