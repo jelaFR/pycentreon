@@ -1,0 +1,11 @@
+# Execution 
+execute_centreon.py
+
+# Environments
+venv
+
+# Python execution cache
+*/__pycache__/*
+
+# Visual Studio Code settings
+.vscode/
