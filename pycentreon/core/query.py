@@ -107,10 +107,10 @@ class ContentError(Exception):
 
 
 class Request:
-    """Creates requests to the Netbox API
+    """Creates requests to the Centreon API
 
     Responsible for building the url and making the HTTP(S) requests to
-    Netbox's API
+    Centreon's API
 
     :param base: (str) Base URL passed in api() instantiation.
     :param filters: (dict, optional) contains key/value pairs that
@@ -151,74 +151,10 @@ class Request:
         self.limit = limit
         self.offset = offset
 
-    def get_openapi(self):
-        """Gets the OpenAPI Spec"""
-        headers = {
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-        }
-
-        current_version = version.parse(self.get_version())
-        if current_version >= version.parse("3.5"):
-            req = self.http_session.get(
-                "{}schema/".format(self.normalize_url(self.base)),
-                headers=headers,
-            )
-        else:
-            req = self.http_session.get(
-                "{}docs/?format=openapi".format(self.normalize_url(self.base)),
-                headers=headers,
-            )
-
-        if req.ok:
-            return req.json()
-        else:
-            raise RequestError(req)
-
-    def get_version(self):
-        """Gets the API version of NetBox.
-
-        Issues a GET request to the base URL to read the API version from the
-        response headers.
-
-        :Raises: RequestError if req.ok returns false.
-        :Returns: Version number as a string. Empty string if version is not
-        present in the headers.
-        """
-        headers = {
-            "Content-Type": "application/json",
-        }
-        req = self.http_session.get(
-            self.normalize_url(self.base),
-            headers=headers,
-        )
-        if req.ok:
-            return req.headers.get("API-Version", "")
-        else:
-            raise RequestError(req)
-
-    def get_status(self):
-        """Gets the status from /api/status/ endpoint in NetBox.
-
-        :Returns: Dictionary as returned by NetBox.
-        :Raises: RequestError if request is not successful.
-        """
-        headers = {"Content-Type": "application/json"}
-        if self.token:
-            headers["authorization"] = "Token {}".format(self.token)
-        req = self.http_session.get(
-            "{}status/".format(self.normalize_url(self.base)),
-            headers=headers,
-        )
-        if req.ok:
-            return req.json()
-        else:
-            raise RequestError(req)
-
     def normalize_url(self, url):
         """Builds a url for POST actions."""
-        if url[-1] != "/" and "login" not in url:
-            return "{}/".format(url)
+        if url[-1] == "/":
+            return "{}".format(url[:-1])
 
         return url
 
@@ -282,7 +218,6 @@ class Request:
         :Returns: List of `Response` objects returned from the
             endpoint.
         """
-
         if not add_params and self.limit is not None:
             add_params = {"limit": self.limit}
             if self.limit and self.offset is not None:

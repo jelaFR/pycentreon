@@ -1,4 +1,6 @@
 """
+General core structure:
+-----------------------
 (c) 2017 DigitalOcean
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -27,19 +29,11 @@ class Api:
     you can specify which app and endpoint you wish to interact with.
 
     Valid attributes currently are:
-        * Acknowledgements
         * Administration
-        * Command
-        * Contacts
-        * Downtimes
-        * Gorgone
-        * Host
-        * Monitoring-servers
-        * Notification
+        * Configuration
+        * Monitoring
         * Platform
-        * Proxy
-        * Service
-        * Timeperiods
+        * Users
 
     Calling any of these attributes will return
     :py:class:`.App` which exposes endpoints as attributes.
@@ -77,23 +71,13 @@ class Api:
         self.base_url = base_url
         self.http_session = requests.Session()
         self.threading = threading
-        self.acknowledgements = App(self, "acknowledgements")
         self.administration = App(self, "administration")
-        self.command = App(self, "command")
-        self.contacts = App(self, "contacts")
-        self.downtimes = App(self, "downtimes")
-        self.gorgone = App(self, "gorgone")
-        self.hosts = App(self, "hosts")
-        self.monitoring_servers = App(self, "monitoring_servers")
-        self.notification = App(self, "notification")
+        self.configuration = App(self, "configuration")
+        self.monitoring = App(self, "monitoring")
         self.platform = App(self, "platform")
-        self.proxy = App(self, "proxy")
-        self.servers = App(self, "servers")
-        self.services = App(self, "services")
-        self.timeperiods = App(self, "timeperiods")
+        self.users = App(self, "users")
 
-
-    def create_token(self, username, password):
+    def login(self, username, password):
         """Creates an API token using a valid Centreon username and password.
         Saves the created token automatically in the API object.
 
@@ -104,7 +88,7 @@ class Api:
 
         >>> import pycentreon
         >>> ctn = pycentreon.api("https://centreon-server")
-        >>> token = ctn.create_token("centreon_user", "centreon_password")
+        >>> token = ctn.login("centreon_user", "centreon_password")
         >>> ctn.token
         '96d02e13e3f1fdcd8b4c089094c0191dcb045bef'
         >>> from pprint import pprint
@@ -130,4 +114,8 @@ class Api:
         # Save the newly created API token, otherwise populating the Record
         # object details will fail
         self.token = resp.get("security", []).get("token",None)
+        return Record(resp, self, None)
+    
+    def logout(self):
+        resp = Request(base="{}/logout".format(self.base_url), http_session=self.http_session).get()
         return Record(resp, self, None)

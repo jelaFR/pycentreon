@@ -11,16 +11,39 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 """
-from pycentreon.core.response import Record
+
+from pycentreon.core.query import Request
+from pycentreon.core.response import Record, JsonField
+from pycentreon.core.endpoint import RODetailEndpoint, DetailEndpoint
+
+class DeviceTypes(Record):
+    def __str__(self):
+        return self.model
+
+## Host class
 
 class Hosts(Record):
-    pass
+  pass
 
-class HostsCategory:
-    pass
+class HostsGroups(Record):
+  pass
 
-class HostsGroups:
-    pass
+class HostsCategories(Record):
+  pass
 
-class HostsTemplates:
-    pass
+class HostsTemplates(Record):
+  pass
+
+## Services class
+
+class Services(Record):
+  pass
+
+class ServicesGroups(Record):
+  pass
+
+class ServicesCategories(Record):
+  pass
+
+class ServicesTemplates(Record):
+  pass

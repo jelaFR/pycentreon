@@ -1,4 +1,6 @@
 """
+General core structure:
+-----------------------
 (c) 2017 DigitalOcean
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,24 +18,16 @@ limitations under the License.
 from pycentreon.core.endpoint import Endpoint
 from pycentreon.core.query import Request
 from pycentreon.models import (
-    acknowledgements,
     administration,
-    command,
-    contacts,
-    downtimes,
-    gorgone,
-    hosts,
-    monitoring_servers,
-    notification,
+    configuration,
+    monitoring,
     platform,
-    proxy,
-    services,
-    timeperiods
+    users
 )
 
 
 class App:
-    """Represents apps in NetBox.
+    """Represents apps in Centreon.
 
     Calls to attributes are returned as Endpoint objects.
 
@@ -48,19 +42,11 @@ class App:
         self._setmodel()
 
     models = {
-        "acknowledgements": acknowledgements,
         "administration": administration,
-        "command": command,
-        "contacts": contacts,
-        "downtimes": downtimes,
-        "gorgone": gorgone,
-        "hosts": hosts,
-        "monitoring_servers": monitoring_servers,
-        "notification": notification,
+        "configuration": configuration,
+        "monitoring": monitoring,
         "platform": platform,
-        "proxy": proxy,
-        "services": services,
-        "timeperiods": timeperiods
+        "users": users
     }
 
     def _setmodel(self):
@@ -79,21 +65,15 @@ class App:
     def config(self):
         """Returns config response from app
 
-        :Returns: Raw response from NetBox's config endpoint.
+        :Returns: Raw response from Centreon's config endpoint.
         :Raises: :py:class:`.RequestError` if called for an invalid endpoint.
         :Example:
 
-        >>> pprint.pprint(nb.users.config())
-        {'tables': {'DeviceTable': {'columns': ['name',
-                                                'status',
-                                                'tenant',
-                                                'role',
-                                                'site',
-                                                'primary_ip',
-                                                'tags']}}}
+        #TODO : Pur a representation of config result
+        >>> pprint.pprint(
         """
         config = Request(
-            base="{}/configuration/{}".format(
+            base="{}/monitoring/{}".format(
                 self.api.base_url,
                 self.name,
             ),

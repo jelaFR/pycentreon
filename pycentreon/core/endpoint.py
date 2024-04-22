@@ -1,4 +1,6 @@
 """
+General core structure:
+-----------------------
 (c) 2017 DigitalOcean
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,7 +22,7 @@ RESERVED_KWARGS = ()
 
 
 class Endpoint:
-    """Represent actions available on endpoints in the Netbox API.
+    """Represent actions available on endpoints in the Centreon API.
 
     Takes ``name`` and ``app`` passed from App() and builds the correct
     url to make queries to and the proper Response object to return
