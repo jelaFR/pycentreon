@@ -12,11 +12,30 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
+from .gorgone import(
+    Pollers
+)
+
 from .configuration import(
     Hosts,
     HostsCategories,
     HostsGroups,
     HostsTemplates,
+    MetaServices,
+    Resources,
+    Services,
+    ServicesCategories,
+    ServicesGroups,
+    ServicesTemplates
+)
+
+from .monitoring import(
+    Hosts,
+    HostsCategories,
+    HostsGroups,
+    HostsTemplates,
+    MetaServices,
+    Resources,
     Services,
     ServicesCategories,
     ServicesGroups,
@@ -29,9 +48,24 @@ CONTENT_TYPE_MAPPER = {
     "configuration.hosts_groups": HostsGroups,
     "configuration.hosts_severities": None,
     "configuration.hosts_templates": HostsTemplates,
+    "configuration.metaservices": MetaServices,
+    "configuration.resources": Resources,
     "configuration.services": Services,
     "configuration.services_categories": ServicesCategories,
     "configuration.services_groups": ServicesGroups,
     "configuration.services_severities": None,
     "configuration.services_templates": ServicesTemplates,
+    "monitoring.hosts": Hosts,
+    "monitoring.hosts_categories": HostsCategories,
+    "monitoring.hosts_groups": HostsGroups,
+    "monitoring.hosts_severities": None,
+    "monitoring.hosts_templates": HostsTemplates,
+    "monitoring.metaservices": MetaServices,
+    "monitoring.resources": Resources,
+    "monitoring.services": Services,
+    "monitoring.services_categories": ServicesCategories,
+    "monitoring.services_groups": ServicesGroups,
+    "monitoring.services_severities": None,
+    "monitoring.services_templates": ServicesTemplates,
+    "gorgone.pollers": Pollers,
 }

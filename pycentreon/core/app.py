@@ -1,6 +1,6 @@
 """
-General core structure:
------------------------
+This project is derived from the `PyNetbox` project on 04-2024
+Original code avaiable here : https://github.com/netbox-community/pynetbox
 (c) 2017 DigitalOcean
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,6 +20,7 @@ from pycentreon.core.query import Request
 from pycentreon.models import (
     administration,
     configuration,
+    gorgone,
     monitoring,
     platform,
     users
@@ -44,9 +45,10 @@ class App:
     models = {
         "administration": administration,
         "configuration": configuration,
+        "gorgone": gorgone,
         "monitoring": monitoring,
         "platform": platform,
-        "users": users
+        "users": users,
     }
 
     def _setmodel(self):
@@ -61,23 +63,3 @@ class App:
 
     def __getattr__(self, name):
         return Endpoint(self.api, self, name, model=self.model)
-
-    def config(self):
-        """Returns config response from app
-
-        :Returns: Raw response from Centreon's config endpoint.
-        :Raises: :py:class:`.RequestError` if called for an invalid endpoint.
-        :Example:
-
-        #TODO : Pur a representation of config result
-        >>> pprint.pprint(
-        """
-        config = Request(
-            base="{}/monitoring/{}".format(
-                self.api.base_url,
-                self.name,
-            ),
-            token=self.api.token,
-            http_session=self.api.http_session,
-        ).get()
-        return config

@@ -1,4 +1,6 @@
 """
+This project is derived from the `PyNetbox` project on 04-2024
+Original code avaiable here : https://github.com/netbox-community/pynetbox
 (c) 2017 DigitalOcean
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -114,6 +116,7 @@ class RecordSet:
         self.request = request
         self.response = self.request.get()
         self._response_cache = []
+        pass
 
     def __iter__(self):
         return self

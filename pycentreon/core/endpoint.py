@@ -1,6 +1,6 @@
 """
-General core structure:
------------------------
+This project is derived from the `PyNetbox` project on 04-2024
+Original code avaiable here : https://github.com/netbox-community/pynetbox
 (c) 2017 DigitalOcean
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -22,7 +22,7 @@ RESERVED_KWARGS = ()
 
 
 class Endpoint:
-    """Represent actions available on endpoints in the Centreon API.
+    """Represent actions available on endpoints in the Centreon API v2.
 
     Takes ``name`` and ``app`` passed from App() and builds the correct
     url to make queries to and the proper Response object to return
@@ -33,18 +33,10 @@ class Endpoint:
     :arg str name: Name of endpoint passed to App().
     :arg obj,optional model: Custom model for given app.
 
-    .. note::
-
-        In order to call NetBox endpoints with dashes in their
-        names you should convert the dash to an underscore.
-        (E.g. querying the ip-addresses endpoint is done with
-        ``nb.ipam.ip_addresses.all()``.)
-
     """
-
     def __init__(self, api, app, name, model=None):
         self.return_obj = self._lookup_ret_obj(name, model)
-        self.name = name.replace("_", "-")
+        self.name = name
         self.api = api
         self.base_url = api.base_url
         self.token = api.token
@@ -68,13 +60,13 @@ class Endpoint:
         :Returns: Record (obj)
         """
         if model:
-            name = name.title().replace("_", "")
+            name = name.title()
             ret = getattr(model, name, Record)
         else:
             ret = Record
         return ret
 
-    def all(self, limit=0, offset=None):
+    def all(self, limit=None, page=None, sort_by=None):
         """Queries the 'ListView' of a given endpoint.
 
         Returns all objects from an endpoint.
@@ -89,38 +81,39 @@ class Endpoint:
 
         :Examples:
 
-        >>> devices = list(nb.dcim.devices.all())
-        >>> for device in devices:
-        ...     print(device.name)
+        >>> hosts = ctn.monitoring.hosts.all(sort_by={"host.name":"ASC"})
+        >>> for host in hosts
+        ...   print(host.name)
         ...
-        test1-leaf1
-        test1-leaf2
-        test1-leaf3
+        host-1
+        host-2
+        host-3
         >>>
 
         If you want to iterate over the results multiple times then
         encapsulate them in a list like this:
-        >>> devices = list(nb.dcim.devices.all())
 
-        This will cause the entire result set
-        to be fetched from the server.
+        >>> hosts = list(ctn.monitoring.hosts.all())
+
+        This will cause the entire result set to be fetched from the server.
 
         """
-        if limit == 0 and offset is not None:
-            raise ValueError("offset requires a positive limit value")
+        if sort_by is not None: # Check sort_by format
+            if not isinstance(sort_by, dict):
+                raise ValueError("sort_by must be a dict. with value as ASC or DSC")
         req = Request(
             base="{}/".format(self.url),
             token=self.token,
             http_session=self.api.http_session,
-            threading=self.api.threading,
             limit=limit,
-            offset=offset,
+            page=page,
+            sort_by=sort_by
         )
 
         return RecordSet(self, req)
 
     def get(self, *args, **kwargs):
-        r"""Queries the DetailsView of a given endpoint.
+        r""" Queries the DetailsView of a given endpoint.
 
         :arg int,optional key: id for the item to be
             retrieved.
@@ -133,26 +126,13 @@ class Endpoint:
 
         :raises ValueError: if kwarg search return more than one value.
 
-        :Examples:
+        :Examples:        
 
-        Referencing with a kwarg that only returns one value.
+        Searching for specific hosts
 
-        >>> nb.dcim.devices.get(name='test1-a3-tor1b')
-        test1-a3-tor1b
-        >>>
+        >>> print(ctn.monitoring.hosts.get(search='{"host.name":"DC1ESX01"}')
 
-        Referencing with an id.
-
-        >>> nb.dcim.devices.get(1)
-        test1-edge1
-        >>>
-
-        Using multiple named arguments. For example, retriving the location when the location name is not unique and used in multiple sites.
-
-        >>> nb.locations.get(site='site-1', name='Row 1')
-        Row 1
         """
-
         try:
             key = args[0]
         except IndexError:
@@ -208,71 +188,15 @@ class Endpoint:
 
         :Examples:
 
-        To return a list of objects matching a named argument filter.
+        Search host monitoring values with its name
 
-        >>> devices = nb.dcim.devices.filter(role='leaf-switch')
-        >>> for device in devices:
-        ...     print(device.name)
-        ...
-        test1-leaf1
-        test1-leaf2
-        test1-leaf3
-        >>>
+        >>> host = ctn.monitoring.hosts.get(search='{"host.name":"host-2"}')
 
-        >>> devices = nb.dcim.devices.filter(site='site-1')
-        >>> for device in devices:
-        ...     print(device.name)
-        ...
-        test1-a2-leaf1
-        test2-a2-leaf2
-        >>>
+        Search all hosts monitored with specific pollers
+        >>> hosts = list(ctn.monitoring.hosts.filter(search='{"poller.id":"2"}'))
 
-        If we want to filter by site, location, tenant, or fields which have a display name and a slug, the slug has to be used for filtering.
+        Search service 
 
-        .. note::
-
-          If a keyword argument is incorrect a `TypeError` will not be returned by pycentreon.
-          Instead, all records filtered up to the last correct keyword argument. For example, if we used `site="Site 1"` instead of `site=site-1` when using filter on
-          the devices endpoint, then pycentreon will return **all** devices across all sites instead of devices at Site 1.
-
-
-        Using a freeform query along with a named argument.
-
-        >>> devices = nb.dcim.devices.filter('a3', role='leaf-switch')
-        >>> for device in devices:
-        ...     print(device.name)
-        ...
-        test1-a3-leaf1
-        test1-a3-leaf2
-        >>>
-
-
-        Chaining multiple named arguments.
-
-        >>> devices = nb.dcim.devices.filter(role='leaf-switch', status=True)
-        >>> for device in devices:
-        ...     print(device.name)
-        ...
-        test1-leaf2
-        >>>
-
-        Passing a list as a named argument adds multiple filters of the
-        same value.
-
-        >>> devices = nb.dcim.devices.filter(role=['leaf-switch', 'spine-switch'])
-        >>> for device in devices:
-        ...     print(device.name)
-        ...
-        test1-a3-spine1
-        test1-a3-spine2
-        test1-a3-leaf1
-        >>>
-
-        To have the ability to iterate over the results multiple times then
-        encapsulate them in a list.  This will cause the entire result set
-        to be fetched from the server.
-
-        >>> devices = list(nb.dcim.devices.filter(role='leaf-switch'))
         """
 
         if args:
@@ -283,18 +207,26 @@ class Endpoint:
                 "A reserved kwarg was passed ({}). Please remove it "
                 "and try again.".format(RESERVED_KWARGS)
             )
-        limit = kwargs.pop("limit") if "limit" in kwargs else 0
-        offset = kwargs.pop("offset") if "offset" in kwargs else None
-        if limit == 0 and offset is not None:
-            raise ValueError("offset requires a positive limit value")
+        limit = kwargs.pop("limit") if "limit" in kwargs else None
+        page = kwargs.pop("page") if "page" in kwargs else None
+        sort_by = kwargs.pop("sort_by") if "sort_by" in kwargs else None
+        if limit is None and page is not None:
+            raise ValueError("page requires a positive limit value")
+        # BUG : Search with (host_name="DC1ESX01") does not work
+        if "search" not in kwargs:
+            # Transforms kwargs to Centreon search format
+            kwargs_dict = self._create_ctn_search(**kwargs)
+        else:
+            kwargs_dict = kwargs
+
         req = Request(
-            filters=kwargs,
+            filters=kwargs_dict,
             base=self.url,
             token=self.token,
             http_session=self.api.http_session,
-            threading=self.api.threading,
             limit=limit,
-            offset=offset,
+            sort_by=sort_by,
+            page=page,
         )
 
         return RecordSet(self, req)
@@ -304,7 +236,7 @@ class Endpoint:
 
         Allows for the creation of new objects on an endpoint. Named
         arguments are converted to json properties, and a single object
-        is created. NetBox's bulk creation capabilities can be used by
+        is created. Centreon's bulk creation capabilities can be used by
         passing a list of dictionaries as the first argument.
 
         .. note:
@@ -321,95 +253,16 @@ class Endpoint:
 
         :Examples:
 
-        Creating an object on the `devices` endpoint:
+        Create a new host based on dict
 
-        >>> device = netbox.dcim.devices.create(
-        ...    name='test',
-        ...    role=1,
-        ... )
-        >>>
-
-        Creating an object on the 'devices' endpoint using `.get()` to get ids.
-
-        >>> device = netbox.dcim.devices.create(
-        ...     name = 'test1',
-        ...     site = netbox.dcim.devices.get(name='site1').id,
-        ...     location = netbox.dcim.locations.get(name='Row 1').id,
-        ...     rack = netbox.dcim.racks.get(facility_id=1).id,
-        ...     device_type = netbox.dcim.device_types.get(slug='server-type-1').id,
-        ...     status='active',
-        ...     )
-        >>>
-
-        Use bulk creation by passing a list of dictionaries:
-
-        >>> nb.dcim.devices.create([
-        ...     {
-        ...         "name": "test1-core3",
-        ...         "role": 3,
-        ...         "site": 1,
-        ...         "device_type": 1,
-        ...         "status": 1
-        ...     },
-        ...     {
-        ...         "name": "test1-core4",
-        ...         "role": 3,
-        ...         "site": 1,
-        ...         "device_type": 1,
-        ...         "status": 1
-        ...     }
-        ... ])
-
-        Create a new device type.
-
-        >>> device_type = netbox.dcim.devices.create(
-        ...     manufacturer = netbox.dcim.manufacturers.get(name='manufacturer-name').id,
-        ...     model = 'device-type-name',
-        ...     slug = 'device-type-slug',
-        ...     subdevice_role = 'child or parent', #optional field - requred if creating a device type to be used by child devices
-        ...     u_height = unit_height, #can only equal 0 if the device type is for a child device - requires subdevice_role='child' if that is the case
-        ...     custom_fields = {'cf_1' : 'custom data 1'}
-        ...     )
-
-        Create a device bay and child device.
-
-        >>> device_bay = netbox.dcim.device_bays.create(
-        ...     device = netbox.dcim.devices.get(name='parent device').id, # device the device bay is located
-        ...     name = 'Bay 1'
-        ...     )
-        >>> child_device = netbox.dcim.devices.create(
-        ...     name = 'child device',
-        ...     site = netbox.dcim.devices.get(name='test-site').id,
-        ...     location = netbox.dcim.locations.get(name='row-1').id,
-        ...     tenant = netbox.tenancy.tenants.get(name='tenant-1').id,
-        ...     manufactuer = netbox.dcim.manufacturers.get(name='test-m').id,
-        ...     rack = netbox.dcim.racks.get(name='Test Rack').id,
-        ...     device_type = netbox.dcim.device.types.get(slug='test-server').id, #easier to get device_type id by search by its slug rather than by its name
-        ...     )
-        >>> get_device_bay = netbox.dcim.device_bays.get(name='Bay 1')
-        >>> get_child_device = netbox.dcim.devices.get(name='child device')
-        >>> get_device_bay.installed_device = get_child_device
-        >>> get_device_bay.save()
-
-        Create a network interface
-
-        >>> interface = netbox.dcim.interfaces.get(name="interface-test", device="test-device")
-        >>> netbox_ip = netbox.ipam.ip_addresses.create(
-        ... address = "ip-address",
-        ... tenant = netbox.tenancy.tenants.get(name='tenant-1').id,
-        ... tags = [{'name':'Tag 1'}],
-        ... )
-        >>> #assign IP Address to device's network interface
-        >>> netbox_ip.assigned_object = interface
-        >>> netbox_ip.assigned_object_id = interface.id
-        >>> netbox_ip.assigned_object_type = 'dcim.interface'
-        >>> # add dns name to IP Address (optional)
-        >>> netbox_ip.dns_name = "test.dns.local"
-        >>> # save changes to IP Address
-        >>> netbox_ip.save()
+        >>> new_host = {"monitoring_server_id": 2, "name": "test_host", 
+                        "address": "127.0.0.1", "alias": "hôte test", 
+                        "snmp_community": "RO", 
+                        "snmp_version": "2c"}
+        >>> ctn = pycentreon.api(centreon_url, token)
+        >>> ctn.configuration.hosts.create(new_host)
 
         """
-
         req = Request(
             base=self.url,
             token=self.token,
@@ -421,42 +274,6 @@ class Endpoint:
         return self.return_obj(req, self.api, self)
 
     def update(self, objects):
-        r"""Bulk updates existing objects on an endpoint.
-
-        Allows for bulk updating of existing objects on an endpoint.
-        Objects is a list whic contain either json/dicts or Record
-        derived objects, which contain the updates to apply.
-        If json/dicts are used, then the id of the object *must* be
-        included
-
-        :arg list objects: A list of dicts or Record.
-
-        :returns: True if the update succeeded
-
-        :Examples:
-
-        Updating objects on the `devices` endpoint:
-
-        >>> devices = nb.dcim.devices.update([
-        ...    {'id': 1, 'name': 'test'},
-        ...    {'id': 2, 'name': 'test2'},
-        ... ])
-        >>> devices
-        [test2, test]
-        >>>
-
-        Use bulk update by passing a list of Records:
-
-        >>> devices = list(nb.dcim.devices.filter())
-        >>> devices
-        [Device1, Device2, Device3]
-        >>> for d in devices:
-        ...     d.name = d.name+'-test'
-        ...
-        >>> nb.dcim.devices.update(devices)
-        [Device1-test, Device2-test, Device3-test]
-        >>>
-        """
         series = []
         if not isinstance(objects, list):
             raise ValueError(
@@ -489,35 +306,6 @@ class Endpoint:
         return self.return_obj(req, self.api, self)
 
     def delete(self, objects):
-        r"""Bulk deletes objects on an endpoint.
-
-        Allows for batch deletion of multiple objects from
-        a single endpoint
-
-        :arg list objects: A list of either ids or Records or
-            a single RecordSet to delete.
-        :returns: True if bulk DELETE operation was successful.
-
-        :Examples:
-
-        Deleting all `devices`:
-
-        >>> netbox.dcim.devices.delete(netbox.dcim.devices.all(0))
-        >>>
-
-        Use bulk deletion by passing a list of ids:
-
-        >>> netbox.dcim.devices.delete([2, 243, 431, 700])
-        >>>
-
-        Use bulk deletion to delete objects eg. when filtering
-        on a `custom_field`:
-        >>> netbox.dcim.devices.delete([
-        >>>         d for d in netbox.dcim.devices.all(0) \
-        >>>             if d.custom_fields.get('field', False)
-        >>>     ])
-        >>>
-        """
         cleaned_ids = []
         if not isinstance(objects, list) and not isinstance(objects, RecordSet):
             raise ValueError(
@@ -550,35 +338,6 @@ class Endpoint:
         return True if req.delete(data=[{"id": i} for i in cleaned_ids]) else False
 
     def choices(self):
-        """Returns all choices from the endpoint.
-
-        The returned dict is also saved in the endpoint object (in
-        ``_choices`` attribute) so that later calls will return the same data
-        without recurring requests to NetBox. When using ``.choices()`` in
-        long-running applications, consider restarting them whenever NetBox is
-        upgraded, to prevent using stale choices data.
-
-        :Returns: Dict containing the available choices.
-
-        :Example:
-
-        >>> from pprint import pprint
-        >>> pprint(nb.ipam.ip_addresses.choices())
-        {'role': [{'display_name': 'Loopback', 'value': 'loopback'},
-                  {'display_name': 'Secondary', 'value': 'secondary'},
-                  {'display_name': 'Anycast', 'value': 'anycast'},
-                  {'display_name': 'VIP', 'value': 'vip'},
-                  {'display_name': 'VRRP', 'value': 'vrrp'},
-                  {'display_name': 'HSRP', 'value': 'hsrp'},
-                  {'display_name': 'GLBP', 'value': 'glbp'},
-                  {'display_name': 'CARP', 'value': 'carp'}],
-         'status': [{'display_name': 'Active', 'value': 'active'},
-                    {'display_name': 'Reserved', 'value': 'reserved'},
-                    {'display_name': 'Deprecated', 'value': 'deprecated'},
-                    {'display_name': 'DHCP', 'value': 'dhcp'},
-                    {'display_name': 'SLAAC', 'value': 'slaac'}]}
-        >>>
-        """
         if self._choices:
             return self._choices
 
@@ -601,36 +360,6 @@ class Endpoint:
         return self._choices
 
     def count(self, *args, **kwargs):
-        r"""Returns the count of objects in a query.
-
-        Takes named arguments that match the usable filters on a
-        given endpoint. If an argument is passed then it's used as a
-        freeform search argument if the endpoint supports it. If no
-        arguments are passed the count for all objects on an endpoint
-        are returned.
-
-        :arg str,optional \*args: Freeform search string that's
-            accepted on given endpoint.
-        :arg str,optional \**kwargs: Any search argument the
-            endpoint accepts can be added as a keyword arg.
-
-        :Returns: Integer with count of objects returns by query.
-
-        :Examples:
-
-        To return a count of objects matching a named argument filter.
-
-        >>> nb.dcim.devices.count(site='tst1')
-        5827
-        >>>
-
-        To return a count of objects on an entire endpoint.
-
-        >>> nb.dcim.devices.count()
-        87382
-        >>>
-        """
-
         if args:
             kwargs.update({"q": args[0]})
 
@@ -649,6 +378,20 @@ class Endpoint:
 
         return ret.get_count()
 
+    def _create_ctn_search(self, **kwargs):
+        """Transforms kwargs to Centreon search compatible format
+
+        Returns:
+            _type_: _description_
+        """
+        ordered_kwargs = {}
+        ctn_search = {}
+        for key in kwargs:
+            new_key_name = key.replace("_",".")
+            ordered_kwargs[new_key_name] = kwargs[key]
+        pass
+        ctn_search.update({"search" : f'{ordered_kwargs}'})
+        return ctn_search
 
 class DetailEndpoint:
     """Enables read/write operations on detail endpoints.

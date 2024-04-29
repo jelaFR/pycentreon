@@ -1,9 +1,9 @@
 """
-General core structure:
------------------------
+This project is derived from the `PyNetbox` project on 04-2024
+Original code avaiable here : https://github.com/netbox-community/pynetbox
 (c) 2017 DigitalOcean
 
-Licensed under the Apache License, Version 2.0 (the "License");
+Licensed under the Apache Licsense, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
@@ -23,89 +23,98 @@ from pycentreon.core.response import Record
 
 
 class Api:
-    """The API object is the point of entry to pycentreon.
+    """The API object is the point of entry to pynetbox.
 
     After instantiating the Api() with the appropriate named arguments
     you can specify which app and endpoint you wish to interact with.
 
     Valid attributes currently are:
-        * Administration
-        * Configuration
-        * Monitoring
-        * Platform
-        * Users
+        * administration
+        * configuration
+        * gorgone
+        * monitoring
+        * platform
+        * users
 
     Calling any of these attributes will return
     :py:class:`.App` which exposes endpoints as attributes.
 
-    **Additional Attributes**:
+        **Additional Attributes**:
         *  **http_session(requests.Session)**:
                 Override the default session with your own. This is used to control
                 a number of HTTP behaviors such as SSL verification, custom headers,
                 retires, and timeouts.
                 See `custom sessions <advanced.html#custom-sessions>`__ for more info.
 
-    :param str url: The base URL to the instance of Centreon you
-        wish to connect to.
-    :param str token: Your Centreon token.
-    :param bool,optional threading: Set to True to use threading in ``.all()``
-        and ``.filter()`` requests.
+    :param str url: Centreon base URL (with the ending /centreon)
+    :param str token: Your NetBox token.
     :raises AttributeError: If app doesn't exist.
+
+
     :Examples:
 
-    >>> import pycentreon
-    >>> nb = pycentreon.api(
-    ...     'https://centreon.domain.com/centreon',
-    ...     token='d6f4e314a5b5fefd164995169f28ae32d987704f'
-    ... )
-    """
+    Using SSL certificates signed with with public CA:
 
+    >>> import pycentreon
+    >>> ctn = pycentreon.api(
+    ...     'https://centreon.example.com/centreon',
+    ...     token='centreon_token_value'
+    ... )
+    >>> print(list(ctn.monitoring.hosts.all()))
+    >>> [host1, host2, host3]
+
+    Using certificates signed with private CA with SSL verification:
+
+    >>> import pycentreon
+    >>> import os
+    >>> os.environ['REQUESTS_CA_BUNDLE'] = "ca_cert.pem"
+    >>> ctn = pycentreon.api(
+    ...     'https://centreon.example.com/centreon',
+    ...     token='centreon_token_value'
+    ... )
+    >>> print(list(ctn.monitoring.hosts.all()))
+    >>> [host1, host2, host3]
+    """
     def __init__(
         self,
         url,
         token=None,
-        threading=False,
-    ):
+    ):            
+        # Centreon httpd uses the following regexp to redirect to Centreon API
+        #   ^\${base_uri}/?(?!api/latest/|api/beta/|api/v[0-9]+/|api/v[0-9]+\.[0-9]+/)(.*\.php(/.*)?)$
         base_url = "{}/api/latest".format(url if url[-1] != "/" else url[:-1])
         self.token = token
         self.base_url = base_url
         self.http_session = requests.Session()
-        self.threading = threading
         self.administration = App(self, "administration")
         self.configuration = App(self, "configuration")
+        self.gorgone = App(self, "gorgone")
         self.monitoring = App(self, "monitoring")
         self.platform = App(self, "platform")
         self.users = App(self, "users")
 
-    def login(self, username, password):
-        """Creates an API token using a valid Centreon username and password.
+    def create_token(self, username, password):
+        """Create an API token for Centreon API v2
         Saves the created token automatically in the API object.
+
+        This requires the following parameters to be set:
+            >> Configuration > Users > Contact/Users
+            -- Centreon Authentication
+            ---- Reach API Configuration : Yes
+            ---- Reach API Realtime : Yes
 
         :Returns: The token as a ``Record`` object.
         :Raises: :py:class:`.RequestError` if the request is not successful.
 
-        :Example:
-
+        :Examples:
         >>> import pycentreon
-        >>> ctn = pycentreon.api("https://centreon-server")
-        >>> token = ctn.login("centreon_user", "centreon_password")
-        >>> ctn.token
-        '96d02e13e3f1fdcd8b4c089094c0191dcb045bef'
-        >>> from pprint import pprint
-        >>> pprint(dict(token))
-            {
-            'contact': {
-                'alias': 'user',
-                'email': 'user@mail.com',
-                'id': 1,
-                'is_admin': True,
-                'name': 'User Name'
-                },
-            'security': {
-                'token': 'centreon_token'
-                }
-            }
-        >>>
+        >>> centreon_login = "api_admin"
+        >>> centreon_password = "api_password"
+        >>> ctn = pycentreon.api('https://centreon.example.com/centreon')
+        >>> ctn.create_token(centreon_login, centreon_password)
+        >>> print(f"Centreon token: {ctn.token}")
+
+        >>> Centreon token: V4olz/ogbqD8xmeqUfdfdfdfdfdfS7p/qThnE/FBi75DjXKII7r8bzzze
         """
         resp = Request(
             base="{}/login".format(self.base_url),
@@ -116,6 +125,16 @@ class Api:
         self.token = resp.get("security", []).get("token",None)
         return Record(resp, self, None)
     
-    def logout(self):
+    def delete_token(self):
+        """ Invalidates existing Centreon API v2 token.
+
+        :Examples:
+        >>> import pycentreon
+        >>> cnt = pycentreon.api(
+        ...     'https://centreon.example.com/centreon',
+        ...     token='centreon_token_value'
+        ... )
+        >>> cnt.logout()
+        """
         resp = Request(base="{}/logout".format(self.base_url), http_session=self.http_session).get()
         return Record(resp, self, None)

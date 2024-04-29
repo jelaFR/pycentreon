@@ -20,40 +20,7 @@ class DeviceTypes(Record):
     def __str__(self):
         return self.model
 
-## Host class
+## Pollers class
 
-class Hosts(Record):
-  pass
-
-class HostsGroups(Record):
-  pass
-
-class HostsCategories(Record):
-  pass
-
-class HostsTemplates(Record):
-  pass
-
-## MetaServices class
-
-class MetaServices(Record):
-  pass
-
-## Ressources class
-
-class Resources(Record):
-  pass
-
-## Services class
-
-class Services(Record):
-  pass
-
-class ServicesGroups(Record):
-  pass
-
-class ServicesCategories(Record):
-  pass
-
-class ServicesTemplates(Record):
+class Pollers(Record):
   pass

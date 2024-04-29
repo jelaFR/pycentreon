@@ -23,7 +23,11 @@ class DeviceTypes(Record):
 ## Host class
 
 class Hosts(Record):
-  pass
+  id: JsonField
+  name: JsonField
+  alias: JsonField
+
+
 
 class HostsGroups(Record):
   pass
@@ -32,6 +36,16 @@ class HostsCategories(Record):
   pass
 
 class HostsTemplates(Record):
+  pass
+
+## MetaServices class
+
+class MetaServices(Record):
+  pass
+
+## Ressources class
+
+class Resources(Record):
   pass
 
 ## Services class

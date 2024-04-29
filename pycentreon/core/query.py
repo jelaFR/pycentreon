@@ -1,4 +1,6 @@
 """
+This project is derived from the `PyNetbox` project on 04-2024
+Original code avaiable here : https://github.com/netbox-community/pynetbox
 (c) 2017 DigitalOcean
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,11 +18,6 @@ limitations under the License.
 import concurrent.futures as cf
 import json
 from packaging import version
-
-
-def calc_pages(limit, count):
-    """Calculate number of pages required for full results set."""
-    return int(count / limit) + (limit % count > 0)
 
 
 class RequestError(Exception):
@@ -99,7 +96,7 @@ class ContentError(Exception):
         self.request_body = req.request.body
         self.base = req.url
         self.error = (
-            "The server returned invalid (non-json) data. Maybe not a NetBox server?"
+            "The server returned invalid (non-json) data."
         )
 
     def __str__(self):
@@ -107,49 +104,38 @@ class ContentError(Exception):
 
 
 class Request:
-    """Creates requests to the Centreon API
-
-    Responsible for building the url and making the HTTP(S) requests to
-    Centreon's API
-
-    :param base: (str) Base URL passed in api() instantiation.
-    :param filters: (dict, optional) contains key/value pairs that
-        correlate to the filters a given endpoint accepts.
-        In (e.g. /api/dcim/devices/?name='test') 'name': 'test'
-        would be in the filters dict.
-    """
-
     def __init__(
         self,
         base,
         http_session,
         filters=None,
         limit=None,
-        offset=None,
+        page=None,
+        sort_by=None,
         key=None,
         token=None,
-        threading=False,
     ):
-        """
-        Instantiates a new Request object
+        """_summary_
 
         Args:
-            base (string): Base URL passed in api() instantiation.
-            filters (dict, optional): contains key/value pairs that
-                correlate to the filters a given endpoint accepts.
-                In (e.g. /api/dcim/devices/?name='test') 'name': 'test'
-                would be in the filters dict.
-            key (int, optional): database id of the item being queried.
+            base (_type_): _description_
+            http_session (_type_): _description_
+            filters (_type_, optional): _description_. Defaults to None.
+            limit (_type_, optional): _description_. Defaults to None.
+            page (_type_, optional): _description_. Defaults to None.
+            sort_by (_type_, optional): _description_. Defaults to None.
+            key (_type_, optional): _description_. Defaults to None.
+            token (_type_, optional): _description_. Defaults to None.
         """
         self.base = self.normalize_url(base)
         self.filters = filters or None
         self.key = key
         self.token = token
         self.http_session = http_session
-        self.url = self.base if not key else "{}{}/".format(self.base, key)
-        self.threading = threading
+        self.url = self.base if not key else "{}/{}".format(self.base, key)
         self.limit = limit
-        self.offset = offset
+        self.page = page
+        self.sort_by = sort_by
 
     def normalize_url(self, url):
         """Builds a url for POST actions."""
@@ -193,78 +179,29 @@ class Request:
         else:
             raise RequestError(req)
 
-    def concurrent_get(self, ret, page_size, page_offsets):
-        futures_to_results = []
-        with cf.ThreadPoolExecutor(max_workers=4) as pool:
-            for offset in page_offsets:
-                new_params = {"offset": offset, "limit": page_size}
-                futures_to_results.append(
-                    pool.submit(self._make_call, add_params=new_params)
-                )
-
-            for future in cf.as_completed(futures_to_results):
-                result = future.result()
-                ret.extend(result["results"])
-
     def get(self, add_params=None):
-        """Makes a GET request.
-
-        Makes a GET request to NetBox's API, and automatically recurses
-        any paginated results.
-
-        :raises: RequestError if req.ok returns false.
-        :raises: ContentError if response is not json.
-
-        :Returns: List of `Response` objects returned from the
-            endpoint.
-        """
-        if not add_params and self.limit is not None:
-            add_params = {"limit": self.limit}
-            if self.limit and self.offset is not None:
-                # if non-zero limit and some offset -> add offset
-                add_params["offset"] = self.offset
+        if not add_params and ((self.limit is not None) or (self.page is not None)):
+            add_params = {}
+            if (self.limit is not None) and isinstance(self.limit,str):
+                add_params["limit"] = self.limit
+            else: # Set to default => 10 result per page
+                add_params["limit"] = "10"
+            if self.page is not None and isinstance(self.page,str):
+                add_params["page"] = self.page
         req = self._make_call(add_params=add_params)
-        if isinstance(req, dict) and req.get("results") is not None:
-            self.count = req["count"]
-            if self.offset is not None:
-                # only yield requested page results if paginating
-                for i in req["results"]:
-                    yield i
-            elif self.threading:
-                ret = req["results"]
-                if req.get("next"):
-                    page_size = len(req["results"])
-                    pages = calc_pages(page_size, req["count"])
-                    page_offsets = [
-                        increment * page_size for increment in range(1, pages)
-                    ]
-                    if pages == 1:
-                        req = self._make_call(url_override=req.get("next"))
-                        ret.extend(req["results"])
-                    else:
-                        self.concurrent_get(ret, page_size, page_offsets)
-                for i in ret:
+
+        if isinstance(req, dict) and req.get("result") is not None:
+            self.count = req["meta"]["total"] # Get total object list
+            if add_params:
+                # only yield requested results until limit
+                for i in req["result"]:
                     yield i
             else:
-                first_run = True
-                for i in req["results"]:
+                # yield all results
+                add_params = {"limit": self.count}
+                req = self._make_call(add_params=add_params)
+                for i in req["result"]:
                     yield i
-                while req["next"]:
-                    # Not worrying about making sure add_params kwargs is
-                    # passed in here because results from detail routes aren't
-                    # paginated, thus far.
-                    if first_run:
-                        req = self._make_call(
-                            add_params={
-                                "limit": self.limit or req["count"],
-                                "offset": len(req["results"]),
-                            }
-                        )
-                    else:
-                        req = self._make_call(url_override=req["next"])
-                    first_run = False
-                    for i in req["results"]:
-                        yield i
         elif isinstance(req, list):
             self.count = len(req)
             for i in req:
@@ -295,8 +232,7 @@ class Request:
             json object and sent to the API.
         :raises: RequestError if req.ok returns false.
         :raises: AllocationError if req.status_code is 409 (Conflict)
-            as with available-ips and available-prefixes when there is
-            no room for the requested allocation.
+            as with host / service already existing
         :raises: ContentError if response is not json.
         :Returns: Dict containing the response from NetBox's API.
         """
@@ -355,5 +291,5 @@ class Request:
         """
 
         if not hasattr(self, "count"):
-            self.count = self._make_call(add_params={"limit": 1, "brief": 1})["count"]
+            self.count = self._make_call(add_params={"limit": 0})["meta"].get("total", 0)
         return self.count
